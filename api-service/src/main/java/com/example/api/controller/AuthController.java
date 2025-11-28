@@ -44,4 +44,16 @@ public class AuthController {
         }
         return ResponseEntity.status(401).body("Invalid credentials");
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout() {
+        return ResponseEntity.ok("Logged out successfully");
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(org.springframework.security.core.Authentication authentication) {
+        String username = (String) authentication.getPrincipal();
+        User user = userService.findByUsername(username).orElseThrow();
+        return ResponseEntity.ok(user);
+    }
 }

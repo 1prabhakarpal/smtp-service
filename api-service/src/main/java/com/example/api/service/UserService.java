@@ -33,4 +33,8 @@ public class UserService {
         Optional<User> user = userRepository.findByUsername(username);
         return user.map(u -> passwordEncoder.matches(password, u.getPassword())).orElse(false);
     }
+
+    public Optional<User> findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
 }

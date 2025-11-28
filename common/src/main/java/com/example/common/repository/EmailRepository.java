@@ -8,5 +8,11 @@ import java.util.List;
 
 @Repository
 public interface EmailRepository extends JpaRepository<Email, Long> {
-    List<Email> findByRecipient(String recipient);
+        List<Email> findByRecipient(String recipient);
+
+        org.springframework.data.domain.Page<Email> findByUser_Id(Long userId,
+                        org.springframework.data.domain.Pageable pageable);
+
+        org.springframework.data.domain.Page<Email> findByUser_IdAndFolder_Id(Long userId, Long folderId,
+                        org.springframework.data.domain.Pageable pageable);
 }

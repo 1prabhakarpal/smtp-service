@@ -33,6 +33,14 @@ public class Email {
     @Column(name = "received_at")
     private LocalDateTime receivedAt;
 
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    @ManyToOne
+    @JoinColumn(name = "folder_id")
+    private Folder folder;
+
     @PrePersist
     protected void onCreate() {
         receivedAt = LocalDateTime.now();
