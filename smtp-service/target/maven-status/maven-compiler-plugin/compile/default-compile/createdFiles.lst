@@ -1,1 +1,4 @@
+com\example\smtp\SimpleMessageHandler.class
+com\example\smtp\SimpleMessageHandlerFactory.class
+com\example\smtp\security\DkimSignerUtil.class
 com\example\smtp\SmtpServiceApplication.class

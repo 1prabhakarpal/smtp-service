@@ -2,12 +2,18 @@ package com.example.common.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import java.time.LocalDateTime;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 
-@Data
 @Entity
 @Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -16,15 +22,5 @@ public class User {
     private String username;
 
     @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
-
-    @ManyToOne
-    @JoinColumn(name = "domain_id")
-    private Domain domain;
-
-    @Column(name = "is_admin")
-    private boolean isAdmin = false;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private String password;
 }
