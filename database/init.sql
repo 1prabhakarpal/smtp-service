@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL, -- full email or local part
     password_hash VARCHAR(255) NOT NULL,
+    roles VARCHAR(255) DEFAULT 'USER',
     domain_id INT REFERENCES domains(id),
     is_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

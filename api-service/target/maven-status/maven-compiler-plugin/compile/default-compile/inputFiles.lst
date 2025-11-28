@@ -1,7 +1,9 @@
 D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\controller\EmailController.java
 D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\security\JwtUtil.java
 D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\service\UserService.java
+D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\dto\LoginRequest.java
 D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\controller\AuthController.java
 D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\config\SecurityConfig.java
 D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\security\JwtAuthenticationFilter.java
 D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\ApiServiceApplication.java
+D:\WORKSPACE\smtp-service\api-service\src\main\java\com\example\api\dto\LoginResponse.java

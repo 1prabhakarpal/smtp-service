@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api")
 public class AuthController {
 
     private final UserService userService;
@@ -32,14 +32,16 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> payload) {
-        String username = payload.get("username");
-        String password = payload.get("password");
-        if (userService.login(username, password)) {
-            String token = jwtUtil.generateToken(username);
-            return ResponseEntity.ok(Map.of("token", token));
-        } else {
-            return ResponseEntity.status(401).body("Invalid credentials");
+    public ResponseEntity<?> login(@RequestBody com.example.api.dto.LoginRequest loginRequest) {
+        if (userService.login(loginRequest.getUsername(), loginRequest.getPassword())) {
+            String token = jwtUtil.generateToken(loginRequest.getUsername(), "USER");
+            return ResponseEntity.ok(com.example.api.dto.LoginResponse.builder()
+                    .token(token)
+                    .type("Bearer")
+                    .username(loginRequest.getUsername())
+                    .roles("USER")
+                    .build());
         }
+        return ResponseEntity.status(401).body("Invalid credentials");
     }
 }

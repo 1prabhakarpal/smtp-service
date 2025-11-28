@@ -23,4 +23,8 @@ public class User {
 
     @Column(name = "password_hash", nullable = false)
     private String password;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String roles = "USER";
 }
