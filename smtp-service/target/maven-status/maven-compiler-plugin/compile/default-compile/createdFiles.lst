@@ -1,4 +1,10 @@
-com\example\smtp\SimpleMessageHandler.class
+com\example\smtp\config\SmtpServerConfig$1.class
+com\example\smtp\handler\MailHandlerFactory.class
 com\example\smtp\SimpleMessageHandlerFactory.class
+com\example\smtp\handler\MailHandler.class
 com\example\smtp\security\DkimSignerUtil.class
 com\example\smtp\SmtpServiceApplication.class
+com\example\smtp\SimpleMessageHandler.class
+com\example\smtp\util\RateLimiter.class
+com\example\smtp\config\SmtpServerConfig.class
+com\example\smtp\handler\MailHandlerFactory$RejectingMessageHandler.class
