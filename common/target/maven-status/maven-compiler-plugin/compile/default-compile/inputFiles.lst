@@ -1,0 +1,12 @@
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\entity\User.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\entity\Email.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\repository\DomainRepository.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\repository\OutboundQueueRepository.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\entity\OutboundQueue.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\entity\Domain.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\repository\EmailRepository.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\repository\AttachmentRepository.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\repository\FolderRepository.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\repository\UserRepository.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\entity\Attachment.java
+D:\WORKSPACE\smtp-service\common\src\main\java\com\example\common\entity\Folder.java
