@@ -1,0 +1,32 @@
+# Build Stage
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /app
+
+# Copy parent pom and modules
+COPY pom.xml .
+COPY common/pom.xml common/
+COPY smtp-service/pom.xml smtp-service/
+COPY api-service/pom.xml api-service/
+
+# Copy source code
+COPY common/src common/src
+COPY smtp-service/src smtp-service/src
+COPY api-service/src api-service/src
+
+# Build common module first then api-service
+RUN mvn clean install -DskipTests -pl common,api-service -am
+
+# Run Stage
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+
+# Copy built jar from build stage
+COPY --from=build /app/api-service/target/*.jar app.jar
+
+# Expose API port
+EXPOSE 8080
+
+# Environment variables
+ENV JAVA_OPTS=""
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

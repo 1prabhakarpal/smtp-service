@@ -47,7 +47,8 @@ public class SmtpServerConfig {
     public SMTPServer smtpServerInbound(MailHandlerFactory mailHandlerFactory) {
         return SMTPServer.port(port)
                 .messageHandlerFactory(mailHandlerFactory)
-                .requireTLS(false)
+                .enableTLS(true)
+                .requireTLS(false) // Opportunistic TLS
                 .build();
     }
 
@@ -57,7 +58,8 @@ public class SmtpServerConfig {
         return SMTPServer.port(submissionPort)
                 .messageHandlerFactory(mailHandlerFactory)
                 .authenticationHandlerFactory(authHandlerFactory)
-                .requireTLS(false)
+                .enableTLS(true)
+                .requireTLS(false) // Clients can choose
                 .requireAuth(true)
                 .build();
     }

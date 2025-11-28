@@ -6,85 +6,95 @@ services:
     container_name: traefik
     command:
       - "--api.insecure=true"
-      - "--providers.file.filename=/etc/traefik/traefik.yml"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.smtp.address=:25"
-      - "--entrypoints.submission.address=:587"
-      - "--entrypoints.smtps.address=:465"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
       - "443:443"
-      - "8081:8080" # Traefik Dashboard
-      - "25:25"
-      - "587:587"
-      - "465:465"
+      - "8081:8080" # Dashboard
     volumes:
-      - ./proxy/traefik.yml:/etc/traefik/traefik.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
-      - internal-net
+      - mail-network
+    restart: unless-stopped
 
   postgres:
     image: postgres:15-alpine
     container_name: postgres
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: mailserver
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - internal-net
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mailserver"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - mail-network
+    restart: unless-stopped
 
   smtp-service:
-    build: ./smtp-service
+    build:
+      context: .
+      dockerfile: Dockerfile.smtp
     container_name: smtp-service
+    ports:
+      - "25:25"
+      - "587:587"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/mailserver
-      - SPRING_DATASOURCE_USERNAME=user
-      - SPRING_DATASOURCE_PASSWORD=password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      DKIM_PRIVATE_KEY_PATH: /app/dkim/private.key
+      DKIM_SIGNING_DOMAIN: ${DOMAIN}
+      DKIM_SIGNING_SELECTOR: ${DKIM_SELECTOR}
+      SMTP_PORT: 25
+      SMTP_SUBMISSION_PORT: 587
+      SERVER_PORT: 8090
+    volumes:
+      - ./dkim:/app/dkim
+      - ./logs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     networks:
-      - internal-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.tcp.routers.smtp.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.smtp.entrypoints=smtp"
-      - "traefik.tcp.routers.smtp.service=smtp-service"
-      - "traefik.tcp.services.smtp-service.loadbalancer.server.port=2500"
-      # Add submission and smtps routers similarly if needed, or handle in app
+      - mail-network
+    restart: unless-stopped
 
   api-service:
-    build: ./api-service
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     container_name: api-service
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/mailserver
-      - SPRING_DATASOURCE_USERNAME=user
-      - SPRING_DATASOURCE_PASSWORD=password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      APP_JWT_SECRET: ${JWT_SECRET}
+      APP_JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
+      SERVER_PORT: 8080
+      SPRING_MAIL_HOST: smtp-service
+      SPRING_MAIL_PORT: 25
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
+      - smtp-service
     networks:
-      - internal-net
+      - mail-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.routers.api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=myresolver"
       - "traefik.http.services.api.loadbalancer.server.port=8080"
-
-networks:
-  internal-net:
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+
+
+networks:
+  mail-network:
+    driver: bridge
