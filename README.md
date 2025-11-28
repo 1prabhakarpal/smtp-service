@@ -4,7 +4,11 @@
 This project is a robust, modular Java-based email server solution designed for high performance and scalability. It employs a microservices architecture within a monorepo, separating core domain logic, SMTP handling, and API management.
 
 ## Key Features
-- **SMTP Server**: Built with SubEthaSMTP, supporting TLS encryption and DKIM signing utility.
+- **SMTP Server**: Built with SubEthaSMTP, supporting TLS encryption.
+- **Outbound Delivery**: Robust sending engine with:
+  - **DKIM Signing**: Authenticated email sending using `simple-java-mail`.
+  - **Smart Routing**: Automatic MX record lookup via `dnsjava` or configurable relay.
+  - **Reliability**: Database-backed queue with exponential backoff retry logic.
 - **REST API**: Spring Boot-based API for user management and email retrieval.
 - **Security**:
   - **Authentication**: JWT-based auth with Role-Based Access Control (RBAC).
@@ -16,7 +20,9 @@ This project is a robust, modular Java-based email server solution designed for 
 The system is composed of the following modules:
 
 - **`common`**: Shared domain entities (`User`, `Email`), repositories, and utility classes.
-- **`smtp-service`**: A dedicated SMTP server listening on port 25000 (dev) or 25. Handles incoming emails and persists messages to the database.
+- **`smtp-service`**: Handles both inbound and outbound mail.
+  - **Inbound**: Listens on port 25000 (dev) or 25.
+  - **Outbound**: Background worker processes the mail queue and delivers emails.
 - **`api-service`**: A Spring Boot REST API (port 8095) for:
   - User Registration & Login (`/api/auth`)
   - Email Retrieval (`/api/emails`)
@@ -47,6 +53,24 @@ Start the PostgreSQL database and services:
 docker-compose up -d
 ```
 *Note: This starts Postgres on port 5432, SMTP on 25000, and API on 8095.*
+
+## Configuration
+
+### Outbound Mail & DKIM
+Configure the following in `smtp-service/src/main/resources/application.properties`:
+
+```properties
+# DKIM Configuration
+dkim.signing.domain=example.com
+dkim.signing.selector=default
+dkim.private.key.path=dkim_private.der
+
+# Relay Configuration (Optional - leave empty for direct MX delivery)
+relay.host=
+relay.port=587
+relay.username=
+relay.password=
+```
 
 ## API Reference
 

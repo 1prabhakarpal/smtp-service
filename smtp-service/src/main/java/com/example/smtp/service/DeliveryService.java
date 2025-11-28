@@ -1,17 +1,17 @@
 package com.example.smtp.service;
 
-import com.example.smtp.entity.OutboundEmail;
-import jakarta.mail.Message;
+import com.example.common.entity.OutboundQueue;
+import com.example.common.repository.MailQueueRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.Session;
 import jakarta.mail.Transport;
-import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Properties;
 
@@ -20,69 +20,115 @@ import java.util.Properties;
 @Slf4j
 public class DeliveryService {
 
-    private final DnsService dnsService;
-    private final DkimService dkimService;
+    private final MailQueueRepository mailQueueRepository;
+    private final MxLookupService mxLookupService;
+    private final DkimSigningService dkimSigningService;
 
-    @Value("${smtp.relay.host:}")
+    @Value("${relay.host:}")
     private String relayHost;
 
-    @Value("${smtp.relay.port:25}")
+    @Value("${relay.port:587}")
     private int relayPort;
 
-    @Value("${smtp.helo.domain:localhost}")
-    private String heloDomain;
+    @Value("${relay.username:}")
+    private String relayUsername;
 
-    public void deliver(OutboundEmail email) throws Exception {
-        log.info("Attempting delivery for email ID: {} to {}", email.getId(), email.getRecipient());
+    @Value("${relay.password:}")
+    private String relayPassword;
 
-        String targetHost = relayHost;
-        int targetPort = relayPort;
+    @Value("${smtp.client.connection.timeout:5000}")
+    private String connectionTimeout;
 
-        if (targetHost == null || targetHost.isEmpty()) {
-            String domain = getDomainFromRecipient(email.getRecipient());
-            List<String> mxRecords = dnsService.getMxRecords(domain);
-            if (mxRecords.isEmpty()) {
-                throw new MessagingException("No MX records found for domain: " + domain);
-            }
-            targetHost = mxRecords.get(0); // Use highest priority
-            targetPort = 25;
-            log.debug("Resolved MX record: {} for domain: {}", targetHost, domain);
-        } else {
-            log.debug("Using relay host: {}:{}", targetHost, targetPort);
-        }
+    @Value("${smtp.client.read.timeout:10000}")
+    private String readTimeout;
 
-        Properties props = new Properties();
-        props.put("mail.smtp.host", targetHost);
-        props.put("mail.smtp.port", String.valueOf(targetPort));
-        props.put("mail.smtp.localhost", heloDomain);
-        props.put("mail.smtp.connectiontimeout", "5000");
-        props.put("mail.smtp.timeout", "10000");
+    @Value("${smtp.client.localhost:localhost}")
+    private String localhost;
 
-        Session session = Session.getInstance(props);
-        MimeMessage message = new MimeMessage(session);
+    @Value("${queue.retry.max.attempts:5}")
+    private int maxRetries;
 
-        message.setFrom(new InternetAddress(email.getSender()));
-        message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(email.getRecipient()));
-        message.setSubject(email.getSubject());
-        message.setText(email.getBody()); // Assuming plain text for now
+    @Value("${queue.retry.backoff.factor:2}")
+    private int backoffFactor;
 
-        // Sign with DKIM
-        dkimService.sign(message);
-
+    public void processItem(OutboundQueue item) {
         try {
-            Transport.send(message);
-            log.info("Email ID: {} delivered successfully to {}", email.getId(), targetHost);
-        } catch (MessagingException e) {
-            log.error("Failed to deliver email ID: {} to {}", email.getId(), targetHost, e);
-            throw e;
+            log.info("Processing outbound item ID: {}", item.getId());
+
+            // 1. Sign with DKIM (and parse)
+            MimeMessage message;
+            try {
+                message = dkimSigningService.signMessage(item.getEmailData());
+            } catch (Exception e) {
+                log.error("Failed to sign message with DKIM, sending unsigned", e);
+                // Fallback to unsigned if signing fails? Or fail?
+                // Let's fallback for now but log error
+                Session session = Session.getInstance(new Properties());
+                message = new MimeMessage(session, new java.io.ByteArrayInputStream(item.getEmailData()));
+            }
+
+            // 2. Determine Target Host
+            String recipient = item.getRecipient();
+            String domain = recipient.substring(recipient.indexOf('@') + 1);
+            String targetHost = relayHost;
+            int targetPort = relayPort;
+
+            if (targetHost == null || targetHost.isEmpty()) {
+                List<String> mxRecords = mxLookupService.getMxRecords(domain);
+                if (mxRecords.isEmpty()) {
+                    throw new MessagingException("No MX records found for domain: " + domain);
+                }
+                targetHost = mxRecords.get(0);
+                targetPort = 25; // Standard SMTP port for direct delivery
+            }
+
+            // 3. Send Email
+            log.info("Sending email to {} via {}:{}", recipient, targetHost, targetPort);
+            Properties props = new Properties();
+            props.put("mail.smtp.host", targetHost);
+            props.put("mail.smtp.port", String.valueOf(targetPort));
+            props.put("mail.smtp.connectiontimeout", connectionTimeout);
+            props.put("mail.smtp.timeout", readTimeout);
+            props.put("mail.smtp.localhost", localhost); // HELO/EHLO host
+
+            if (relayUsername != null && !relayUsername.isEmpty()) {
+                props.put("mail.smtp.auth", "true");
+                props.put("mail.smtp.starttls.enable", "true");
+            }
+
+            Session transportSession = Session.getInstance(props);
+            try (Transport transport = transportSession.getTransport("smtp")) {
+                if (relayUsername != null && !relayUsername.isEmpty() && targetHost.equals(relayHost)) {
+                    transport.connect(relayHost, relayUsername, relayPassword);
+                } else {
+                    transport.connect();
+                }
+                transport.sendMessage(message, message.getAllRecipients());
+            }
+
+            // 4. Update Status
+            item.setStatus("SENT");
+            item.setErrorMessage(null);
+            mailQueueRepository.save(item);
+            log.info("Email sent successfully. Item ID: {}", item.getId());
+
+        } catch (Exception e) {
+            log.error("Failed to send email. Item ID: {}", item.getId(), e);
+            handleFailure(item, e.getMessage());
         }
     }
 
-    private String getDomainFromRecipient(String recipient) {
-        int atIndex = recipient.lastIndexOf('@');
-        if (atIndex > 0 && atIndex < recipient.length() - 1) {
-            return recipient.substring(atIndex + 1);
+    private void handleFailure(OutboundQueue item, String errorMessage) {
+        item.setRetryCount(item.getRetryCount() + 1);
+        item.setErrorMessage(errorMessage);
+        if (item.getRetryCount() >= maxRetries) {
+            item.setStatus("FAILED");
+        } else {
+            item.setStatus("RETRY");
+            // Exponential backoff: backoffFactor^retryCount * 1 minute
+            long delayMinutes = (long) Math.pow(backoffFactor, item.getRetryCount());
+            item.setNextRetryAt(LocalDateTime.now().plusMinutes(delayMinutes));
         }
-        throw new IllegalArgumentException("Invalid recipient address: " + recipient);
+        mailQueueRepository.save(item);
     }
 }

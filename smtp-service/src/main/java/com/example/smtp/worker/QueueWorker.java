@@ -1,10 +1,11 @@
 package com.example.smtp.worker;
 
-import com.example.smtp.entity.OutboundEmail;
-import com.example.smtp.repository.OutboundEmailRepository;
+import com.example.common.entity.OutboundQueue;
+import com.example.common.repository.MailQueueRepository;
 import com.example.smtp.service.DeliveryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,46 +17,33 @@ import java.util.List;
 @Slf4j
 public class QueueWorker {
 
-    private final OutboundEmailRepository outboundEmailRepository;
+    private final MailQueueRepository mailQueueRepository;
     private final DeliveryService deliveryService;
 
-    private static final int MAX_RETRIES = 5;
+    @org.springframework.beans.factory.annotation.Value("${queue.worker.batch.size:10}")
+    private int batchSize;
 
-    @Scheduled(fixedDelay = 10000) // Run every 10 seconds
+    @Scheduled(fixedDelayString = "${queue.worker.fixed.delay:10000}") // Run every 10 seconds
     public void processQueue() {
-        List<OutboundEmail> pendingEmails = outboundEmailRepository.findDueForDelivery(LocalDateTime.now());
+        log.debug("Checking for outbound emails...");
+        List<OutboundQueue> pendingItems = mailQueueRepository.findByStatusAndNextRetryAtBeforeOrderByNextRetryAtAsc(
+                "PENDING", LocalDateTime.now(), PageRequest.of(0, batchSize));
 
-        if (!pendingEmails.isEmpty()) {
-            log.info("Found {} emails due for delivery", pendingEmails.size());
+        if (pendingItems.isEmpty()) {
+            // Also check for RETRY items that are due
+            pendingItems = mailQueueRepository.findByStatusAndNextRetryAtBeforeOrderByNextRetryAtAsc(
+                    "RETRY", LocalDateTime.now(), PageRequest.of(0, batchSize));
         }
 
-        for (OutboundEmail email : pendingEmails) {
-            try {
-                deliveryService.deliver(email);
-                email.setStatus(OutboundEmail.Status.SENT);
-                email.setErrorMessage(null);
-                outboundEmailRepository.save(email);
-            } catch (Exception e) {
-                handleFailure(email, e);
+        if (!pendingItems.isEmpty()) {
+            log.info("Found {} items to process", pendingItems.size());
+            for (OutboundQueue item : pendingItems) {
+                try {
+                    deliveryService.processItem(item);
+                } catch (Exception e) {
+                    log.error("Error processing item ID: {}", item.getId(), e);
+                }
             }
         }
-    }
-
-    private void handleFailure(OutboundEmail email, Exception e) {
-        int retryCount = email.getRetryCount() + 1;
-        email.setRetryCount(retryCount);
-        email.setErrorMessage(e.getMessage());
-
-        if (retryCount >= MAX_RETRIES) {
-            email.setStatus(OutboundEmail.Status.FAILED);
-            log.error("Email ID: {} failed permanently after {} retries", email.getId(), retryCount);
-        } else {
-            // Exponential backoff: 2^retryCount minutes
-            long delayMinutes = (long) Math.pow(2, retryCount);
-            email.setNextRetryAt(LocalDateTime.now().plusMinutes(delayMinutes));
-            log.warn("Email ID: {} failed. Retrying in {} minutes. Error: {}", email.getId(), delayMinutes,
-                    e.getMessage());
-        }
-        outboundEmailRepository.save(email);
     }
 }
