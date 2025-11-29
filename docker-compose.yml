@@ -28,11 +28,13 @@ services:
     image: postgres:15-alpine
     container_name: postgres
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-mailuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-securepassword}
+      POSTGRES_DB: ${DB_NAME:-maildb}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     networks:
       - mail-network
     restart: unless-stopped
@@ -46,9 +48,9 @@ services:
       - "25:25"
       - "587:587"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
-      SPRING_DATASOURCE_USERNAME: ${DB_USER}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-maildb}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-mailuser}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-securepassword}
       DKIM_PRIVATE_KEY_PATH: /app/dkim/private.key
       DKIM_SIGNING_DOMAIN: ${DOMAIN}
       DKIM_SIGNING_SELECTOR: ${DKIM_SELECTOR}
@@ -70,9 +72,9 @@ services:
       dockerfile: Dockerfile.api
     container_name: api-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
-      SPRING_DATASOURCE_USERNAME: ${DB_USER}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-maildb}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-mailuser}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-securepassword}
       APP_JWT_SECRET: ${JWT_SECRET}
       APP_JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
       SERVER_PORT: 8080

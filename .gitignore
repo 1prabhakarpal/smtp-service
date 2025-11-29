@@ -34,3 +34,4 @@ dkim_private.der
 smtp.pem
 META-INF/
 *.ps1
+*.txt
