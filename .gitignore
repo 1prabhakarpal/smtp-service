@@ -31,3 +31,5 @@ logs/
 keystore.jks
 dkim_private.der
 .env
+smtp.pem
+META-INF/

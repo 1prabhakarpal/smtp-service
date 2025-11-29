@@ -93,6 +93,9 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
+                <configuration>
+                    <mainClass>com.example.smtp.SmtpServiceApplication</mainClass>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

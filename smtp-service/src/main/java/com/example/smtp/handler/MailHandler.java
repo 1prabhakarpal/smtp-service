@@ -1,6 +1,8 @@
 package com.example.smtp.handler;
 
+import com.example.common.entity.OutboundQueue;
 import com.example.common.repository.EmailRepository;
+import com.example.common.repository.MailQueueRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.subethamail.smtp.MessageContext;
 import org.subethamail.smtp.MessageHandler;
@@ -20,10 +22,13 @@ public class MailHandler implements MessageHandler {
 
     private final MessageContext context;
     private final EmailRepository emailRepository;
+    private final MailQueueRepository mailQueueRepository;
 
-    public MailHandler(MessageContext context, EmailRepository emailRepository) {
+    public MailHandler(MessageContext context, EmailRepository emailRepository,
+            MailQueueRepository mailQueueRepository) {
         this.context = context;
         this.emailRepository = emailRepository;
+        this.mailQueueRepository = mailQueueRepository;
     }
 
     @Override
@@ -38,7 +43,10 @@ public class MailHandler implements MessageHandler {
     public String data(InputStream data) throws RejectException, IOException {
         log.info("DATA received, parsing message manually...");
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(data, StandardCharsets.UTF_8));
+        byte[] rawData = data.readAllBytes();
+        java.io.ByteArrayInputStream inputStream = new java.io.ByteArrayInputStream(rawData);
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
         Map<String, String> headers = new HashMap<>();
         StringBuilder bodyBuilder = new StringBuilder();
         boolean inBody = false;
@@ -77,6 +85,20 @@ public class MailHandler implements MessageHandler {
 
         emailRepository.save(email);
         log.info("Email saved to database.");
+
+        // Save to Outbound Queue
+        OutboundQueue queueItem = new OutboundQueue();
+        queueItem.setSender(from);
+        queueItem.setRecipient(to);
+        queueItem.setEmailData(rawData);
+        queueItem.setStatus("PENDING");
+        queueItem.setRetryCount(0);
+        queueItem.setNextRetryAt(java.time.LocalDateTime.now());
+        queueItem.setCreatedAt(java.time.LocalDateTime.now());
+
+        mailQueueRepository.save(queueItem);
+        log.info("Email added to Outbound Queue for delivery.");
+
         return null;
     }
 

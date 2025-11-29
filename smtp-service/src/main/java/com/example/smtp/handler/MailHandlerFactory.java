@@ -19,6 +19,7 @@ import java.net.InetSocketAddress;
 public class MailHandlerFactory implements MessageHandlerFactory {
 
     private final EmailRepository emailRepository;
+    private final com.example.common.repository.MailQueueRepository mailQueueRepository;
     private final RateLimiter rateLimiter;
 
     @Override
@@ -35,7 +36,7 @@ public class MailHandlerFactory implements MessageHandlerFactory {
                 return new RejectingMessageHandler(e.getMessage());
             }
         }
-        return new MailHandler(context, emailRepository);
+        return new MailHandler(context, emailRepository, mailQueueRepository);
     }
 
     private static class RejectingMessageHandler implements MessageHandler {
