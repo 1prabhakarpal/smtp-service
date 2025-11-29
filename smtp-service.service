@@ -1,0 +1,14 @@
+[Unit]
+Description=SMTP Service
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/usr/bin/java -jar /home/ubuntu/smtp-service.jar --spring.datasource.url=jdbc:h2:mem:testdb --spring.datasource.driverClassName=org.h2.Driver --spring.jpa.database-platform=org.hibernate.dialect.H2Dialect --spring.datasource.username=sa --spring.datasource.password=
+SuccessExitStatus=143
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
